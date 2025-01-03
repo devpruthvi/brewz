@@ -1,0 +1,80 @@
+#!/usr/bin/env zsh
+
+export SHELL=zsh
+
+# If brew isn't installed, exit with an error
+if ! command -v brew >/dev/null 2>&1; then
+  echo "Homebrew (brew) not found. are we on macOS?" >&2
+  exit 1
+fi
+
+__brew_help() {
+  PROG=$(basename "$0")
+  cat >&2 <<EOF
+Usage: $PROG [OPTS]
+
+A fzf terminal UI for brew.
+
+Multiple packages can be selected.
+
+Keybindings:
+  TAB                    Select
+  Shift+TAB              Deselect
+
+OPTS:
+  -h, --help             Print this message
+
+  All other options are passed to brew.
+  Default: install
+
+Examples:
+  brewz fzf
+  brewz install --cask
+  brewz uninstall
+EOF
+  exit 1
+}
+
+__brew_list() {
+  HOMEBREW_COLOR=1 brew search --eval-all --desc "" | sed -E 's/:/ \//;' # add a space before description
+}
+
+while [[ -n $1 ]]; do
+  case $1 in
+  -h | --help)
+    __brew_help
+    ;;
+  __fzf_preview)
+    shift
+    __fzf_preview "$@"
+    ;;
+  *)
+    break
+    ;;
+  esac
+  shift
+done
+
+ARGS=("$@")
+
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+  ARGS=("install")
+fi
+
+# Defaults to install if no arguments are provided
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+  ARGS=("install")
+fi
+
+# Collect selected packages with fzf
+PICKS=($(__brew_list | fzf --multi --ansi --preview="HOMEBRW_COLOR=1 brew info {1}" | sed -E 's/ .*//;'))
+
+
+if [[ ${#PICKS[@]} -eq 0 ]]; then
+  exit 0
+fi
+
+# Execute the brew command with the selected packages and options
+echo "brew" "${ARGS[@]}" "${PICKS[@]}"
+exec brew "${ARGS[@]}" "${PICKS[@]}"
+
